@@ -5,16 +5,7 @@ This project compares two different "SVD recommender" approaches on MovieLens 10
 1. **Method A: Truncated SVD on a centered sparse user-item matrix**
 2. **Method B: Surprise SVD matrix factorization trained on observed ratings only**
 
-The comparison includes RMSE and ranking metrics, latency per sweep point, and top-N recommendations for a selected user.
-
-## Why this is similar to eigenfaces
-
-Both methods rely on low-rank latent structure:
-
-- In eigenfaces, a face image is approximated with a compact basis of principal components.
-- Here, user-item preferences are approximated with a compact latent basis (`k` components / factors).
-
-In both cases, low-rank structure acts as compression + denoising.
+The comparison includes RMSE and ranking metrics, latency per sweep point, and top-N recommendations for a selected user.  Shows low-rank structure acts as compression + denoising.
 
 ## Dataset
 
