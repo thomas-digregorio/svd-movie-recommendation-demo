@@ -70,7 +70,6 @@ def main() -> None:
     print(f"Surprise backend: {get_surprise_backend_label(surprise_model)}")
     surprise_metrics = evaluate_surprise(
         model=surprise_model,
-        train_df=train_df,
         test_df=test_df,
         all_item_ids=all_item_ids,
         ranking_k=ranking_k,
@@ -111,7 +110,6 @@ def main() -> None:
 
     surprise_recs = recommend_surprise(
         model=surprise_model,
-        train_df=train_df,
         all_item_ids=all_item_ids,
         raw_user_id=sample_raw_user_id,
         n_recommendations=n_recommendations,

@@ -192,14 +192,11 @@ def predict_surprise(model: dict[str, Any], test_df: pd.DataFrame) -> np.ndarray
 
 def recommend_surprise(
     model: dict[str, Any],
-    train_df: pd.DataFrame,
     all_item_ids: list[int],
     raw_user_id: int,
     n_recommendations: int,
 ) -> list[tuple[int, float]]:
     """Top-N raw-item recommendations for a raw user id."""
-    del train_df  # model already stores train user-item history
-
     n_recommendations = int(max(0, n_recommendations))
     if n_recommendations == 0:
         return []
@@ -221,7 +218,6 @@ def recommend_surprise(
 
 def evaluate_surprise(
     model: dict[str, Any],
-    train_df: pd.DataFrame,
     test_df: pd.DataFrame,
     all_item_ids: list[int],
     ranking_k: int,
@@ -231,12 +227,12 @@ def evaluate_surprise(
     ranking_k = int(max(1, ranking_k))
     if test_df.empty:
         return {
-            "rmse": 0.0,
-            "precision_at_k": 0.0,
-            "recall_at_k": 0.0,
-            "ndcg_at_k": 0.0,
-            "map_at_k": 0.0,
-            "mrr_at_k": 0.0,
+            "rmse": float("nan"),
+            "precision_at_k": float("nan"),
+            "recall_at_k": float("nan"),
+            "ndcg_at_k": float("nan"),
+            "map_at_k": float("nan"),
+            "mrr_at_k": float("nan"),
             "eligible_users": 0,
         }
 
@@ -259,7 +255,6 @@ def evaluate_surprise(
             continue
         recs = recommend_surprise(
             model=model,
-            train_df=train_df,
             all_item_ids=all_item_ids,
             raw_user_id=int(raw_user_id),
             n_recommendations=ranking_k,
@@ -302,7 +297,6 @@ def run_surprise_sweep(
         )
         metrics = evaluate_surprise(
             model=model,
-            train_df=train_df,
             test_df=test_df,
             all_item_ids=all_item_ids,
             ranking_k=ranking_k,

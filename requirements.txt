@@ -6,3 +6,4 @@ scikit-surprise; python_version < "3.13"
 streamlit
 matplotlib
 requests
+pytest>=8.0

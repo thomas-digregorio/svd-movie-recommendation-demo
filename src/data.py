@@ -16,6 +16,25 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DATA_DIR = PROJECT_ROOT / "data"
 
 
+def _is_within_directory(base_dir: Path, target_path: Path) -> bool:
+    """Return True when target_path resolves under base_dir."""
+    try:
+        target_path.relative_to(base_dir)
+        return True
+    except ValueError:
+        return False
+
+
+def _safe_extractall(archive: zipfile.ZipFile, target_dir: Path) -> None:
+    """Safely extract a zip archive, rejecting path traversal entries."""
+    base_dir = target_dir.resolve()
+    for member in archive.infolist():
+        member_target = (target_dir / member.filename).resolve()
+        if not _is_within_directory(base_dir, member_target):
+            raise ValueError(f"Unsafe zip entry path: {member.filename}")
+    archive.extractall(target_dir)
+
+
 def download_movielens_100k(data_dir: Path | str = DEFAULT_DATA_DIR) -> Path:
     """Download and extract MovieLens 100K if needed, then return dataset directory."""
     data_dir = Path(data_dir)
@@ -34,7 +53,7 @@ def download_movielens_100k(data_dir: Path | str = DEFAULT_DATA_DIR) -> Path:
                     output.write(chunk)
 
     with zipfile.ZipFile(zip_path, "r") as archive:
-        archive.extractall(data_dir)
+        _safe_extractall(archive, data_dir)
 
     if not ratings_path.exists():
         raise FileNotFoundError("MovieLens 100K extraction failed: u.data not found.")
@@ -218,4 +237,3 @@ def compute_dataset_stats(ratings_df: pd.DataFrame) -> dict[str, float | int | d
         "sparsity": float(sparsity),
         "rating_histogram": {int(k): int(v) for k, v in histogram.items()},
     }
-

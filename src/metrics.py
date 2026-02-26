@@ -11,7 +11,7 @@ import numpy as np
 def rmse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     """Root mean squared error."""
     if y_true.size == 0:
-        return 0.0
+        return float("nan")
     diff = y_true.astype(np.float64) - y_pred.astype(np.float64)
     return float(np.sqrt(np.mean(diff * diff)))
 
@@ -129,4 +129,3 @@ def build_relevant_items_map(
         if float(rating) >= threshold:
             user_relevant.add(int(item_id))
     return relevant
-

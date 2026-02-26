@@ -37,6 +37,12 @@ python -m src.sanity_check
 
 This fits both methods with `k=20`, prints metrics, and prints sample recommendations.
 
+## Tests
+
+```bash
+pytest
+```
+
 ## Methods
 
 ### A) Truncated SVD (centered sparse matrix)
@@ -102,10 +108,12 @@ Important implementation choices:
 
 1. `max_users` and `max_interactions` caps are applied **before** split for faster experiments.
 2. The user dropdown shows all raw MovieLens user IDs even when caps reduce the modeled subset.
+   If a selected user is outside the modeled subset, both recommenders show an informational message instead of producing pseudo-personalized output.
 3. While sweeping latent rank, ranking metrics are computed at fixed sidebar `Ranking K` to isolate latent-rank effects from top-K cutoff effects.
 4. Sidebar edits are staged until **Recompute** is clicked.
 5. Model fitting uses `st.cache_resource` and data uses `st.cache_data`.
 6. Changing only `N recommendations` affects display output, not model fitting.
+7. If current cap/split settings produce an empty test split, the app blocks evaluation and asks for a larger testable sample.
 
 ## Caveats
 

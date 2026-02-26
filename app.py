@@ -128,7 +128,19 @@ def _choose_best_model_key(results_df: pd.DataFrame, method: str) -> int | None:
     subset = results_df[results_df["method"] == method]
     if subset.empty:
         return None
-    best = subset.sort_values(
+    sortable = subset.dropna(
+        subset=[
+            "ndcg_at_k",
+            "map_at_k",
+            "mrr_at_k",
+            "precision_at_k",
+            "recall_at_k",
+            "rmse",
+        ]
+    )
+    if sortable.empty:
+        return None
+    best = sortable.sort_values(
         by=[
             "ndcg_at_k",
             "map_at_k",
@@ -240,6 +252,11 @@ def _compute_outputs(config: AppConfig, model_token: int) -> dict[str, Any]:
         seed=config.seed,
         test_size=config.test_size,
     )
+    if test_df.empty:
+        raise ValueError(
+            "Test split is empty under current caps/split settings. "
+            "Increase max_interactions or test_size."
+        )
 
     n_users = int(ratings_df["user_idx"].nunique())
     n_items = int(ratings_df["item_idx"].nunique())
@@ -297,7 +314,6 @@ def _compute_outputs(config: AppConfig, model_token: int) -> dict[str, Any]:
         start = time.perf_counter()
         eval_metrics = evaluate_surprise(
             model=payload["model"],
-            train_df=train_df,
             test_df=test_df,
             all_item_ids=modeled_item_ids,
             ranking_k=config.ranking_k,
@@ -428,10 +444,14 @@ def main() -> None:
 
     if should_compute:
         with st.spinner("Running data prep, model fits, and evaluations..."):
-            st.session_state["outputs"] = _compute_outputs(
-                config=active_config,
-                model_token=st.session_state["model_token"],
-            )
+            try:
+                st.session_state["outputs"] = _compute_outputs(
+                    config=active_config,
+                    model_token=st.session_state["model_token"],
+                )
+            except ValueError as exc:
+                st.error(str(exc))
+                st.stop()
 
     outputs = st.session_state["outputs"]
     if outputs is None:
@@ -584,19 +604,22 @@ def main() -> None:
             st.caption(
                 f"Best model selected by NDCG/MAP/MRR tie-breakers: n_factors={best_surprise_key}"
             )
-            surprise_model = outputs["surprise_models"][best_surprise_key]["model"]
-            recs_raw = recommend_surprise(
-                model=surprise_model,
-                train_df=outputs["train_df"],
-                all_item_ids=outputs["modeled_item_ids"],
-                raw_user_id=int(selected_user),
-                n_recommendations=active_config.n_recommendations,
-            )
-            rec_df = _display_recommendation_table(
-                recs_raw,
-                outputs["movie_title_by_item"],
-            )
-            st.dataframe(rec_df, use_container_width=True)
+            raw_user_to_idx = outputs["raw_user_to_idx"]
+            if int(selected_user) not in raw_user_to_idx:
+                st.info("Selected user not in modeled subset (likely due max_users cap).")
+            else:
+                surprise_model = outputs["surprise_models"][best_surprise_key]["model"]
+                recs_raw = recommend_surprise(
+                    model=surprise_model,
+                    all_item_ids=outputs["modeled_item_ids"],
+                    raw_user_id=int(selected_user),
+                    n_recommendations=active_config.n_recommendations,
+                )
+                rec_df = _display_recommendation_table(
+                    recs_raw,
+                    outputs["movie_title_by_item"],
+                )
+                st.dataframe(rec_df, use_container_width=True)
 
     st.subheader("6) Notes")
     st.markdown(

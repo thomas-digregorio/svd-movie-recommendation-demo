@@ -57,9 +57,7 @@ def fit_truncated(
     z = svd.fit_transform(centered_matrix).astype(np.float32, copy=False)
     v = svd.components_.astype(np.float32, copy=False)
 
-    reconstructed_centered = (z @ v).astype(np.float32, copy=False)
-    reconstructed = reconstructed_centered + user_mean[:, None]
-    np.clip(reconstructed, 1.0, 5.0, out=reconstructed)
+    item_factors = v.T.astype(np.float32, copy=False)
 
     train_items_by_user = {
         int(user): set(items.astype(int).tolist())
@@ -72,7 +70,8 @@ def fit_truncated(
         "n_users": int(n_users),
         "n_items": int(n_items),
         "user_mean": user_mean,
-        "pred_matrix": reconstructed,
+        "user_factors": z,
+        "item_factors": item_factors,
         "train_items_by_user": train_items_by_user,
         "svd_model": svd,
     }
@@ -80,12 +79,18 @@ def fit_truncated(
 
 def predict_truncated(model: dict[str, Any], user_idx: int, item_idx: int) -> float:
     """Predict a user/item rating from the reconstructed matrix."""
-    pred_matrix = model["pred_matrix"]
-    if user_idx < 0 or user_idx >= pred_matrix.shape[0]:
+    n_users = int(model["n_users"])
+    n_items = int(model["n_items"])
+    if user_idx < 0 or user_idx >= n_users:
         raise IndexError(f"user_idx {user_idx} is out of range.")
-    if item_idx < 0 or item_idx >= pred_matrix.shape[1]:
+    if item_idx < 0 or item_idx >= n_items:
         raise IndexError(f"item_idx {item_idx} is out of range.")
-    return float(pred_matrix[user_idx, item_idx])
+    user_factors = model["user_factors"]
+    item_factors = model["item_factors"]
+    user_mean = model["user_mean"]
+    pred_centered = float(np.dot(user_factors[user_idx], item_factors[item_idx]))
+    pred = pred_centered + float(user_mean[user_idx])
+    return float(np.clip(pred, 1.0, 5.0))
 
 
 def recommend_truncated(
@@ -101,7 +106,12 @@ def recommend_truncated(
     if n_recommendations == 0:
         return []
 
-    scores = model["pred_matrix"][user_idx].copy()
+    user_factors = model["user_factors"]
+    item_factors = model["item_factors"]
+    user_mean = model["user_mean"]
+    scores = (item_factors @ user_factors[user_idx]).astype(np.float32, copy=False)
+    scores = scores + np.float32(user_mean[user_idx])
+    np.clip(scores, 1.0, 5.0, out=scores)
     if exclude_train:
         seen_items = model["train_items_by_user"].get(user_idx, set())
         if seen_items:
@@ -128,19 +138,24 @@ def evaluate_truncated(
     ranking_k = int(max(1, ranking_k))
     if test_df.empty:
         return {
-            "rmse": 0.0,
-            "precision_at_k": 0.0,
-            "recall_at_k": 0.0,
-            "ndcg_at_k": 0.0,
-            "map_at_k": 0.0,
-            "mrr_at_k": 0.0,
+            "rmse": float("nan"),
+            "precision_at_k": float("nan"),
+            "recall_at_k": float("nan"),
+            "ndcg_at_k": float("nan"),
+            "map_at_k": float("nan"),
+            "mrr_at_k": float("nan"),
             "eligible_users": 0,
         }
 
     user_idx = test_df["user_idx"].to_numpy(dtype=np.int32)
     item_idx = test_df["item_idx"].to_numpy(dtype=np.int32)
     y_true = test_df["rating"].to_numpy(dtype=np.float32)
-    y_pred = model["pred_matrix"][user_idx, item_idx]
+    user_factors = model["user_factors"][user_idx]
+    item_factors = model["item_factors"][item_idx]
+    user_mean = model["user_mean"][user_idx]
+    y_pred = np.sum(user_factors * item_factors, axis=1).astype(np.float32, copy=False)
+    y_pred = y_pred + user_mean.astype(np.float32, copy=False)
+    np.clip(y_pred, 1.0, 5.0, out=y_pred)
     rmse_value = rmse(y_true, y_pred)
 
     relevant_items_by_user = build_relevant_items_map(
@@ -224,4 +239,3 @@ def run_truncated_sweep(
         )
 
     return pd.DataFrame(rows), models_by_k
-
