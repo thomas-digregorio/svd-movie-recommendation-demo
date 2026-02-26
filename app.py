@@ -16,7 +16,12 @@ from src.data import (
     load_ratings_df,
     make_train_test_split,
 )
-from src.svd_surprise import evaluate_surprise, fit_surprise, recommend_surprise
+from src.svd_surprise import (
+    evaluate_surprise,
+    fit_surprise,
+    get_surprise_backend_label,
+    recommend_surprise,
+)
 from src.svd_truncated import evaluate_truncated, fit_truncated, recommend_truncated
 from src.viz import plot_metric_vs_k, plot_rating_histogram
 
@@ -347,6 +352,11 @@ def _compute_outputs(config: AppConfig, model_token: int) -> dict[str, Any]:
         "results_df": results_df,
         "truncated_models": truncated_models,
         "surprise_models": surprise_models,
+        "surprise_backend": (
+            get_surprise_backend_label(next(iter(surprise_models.values()))["model"])
+            if surprise_models
+            else "unavailable"
+        ),
         "best_truncated_key": best_truncated_key,
         "best_surprise_key": best_surprise_key,
         "raw_user_to_idx": raw_user_to_idx,
@@ -453,6 +463,7 @@ def main() -> None:
         "Optional caps are applied before splitting. "
         "User dropdown still uses all MovieLens 100K user IDs."
     )
+    config_payload["surprise_backend"] = outputs["surprise_backend"]
     config_payload["split_logic_description"] = SPLIT_LOGIC_DESCRIPTION
     st.json(config_payload)
 
@@ -589,10 +600,11 @@ def main() -> None:
 
     st.subheader("6) Notes")
     st.markdown(
-        """
+        f"""
         - `truncated_svd` builds a centered user-item matrix with missing entries as zeros after centering,
           then applies low-rank approximation.
         - `surprise_svd` learns latent factors directly from observed ratings only.
+        - Surprise backend in this run: `{outputs["surprise_backend"]}`.
         - This is offline evaluation: ranking metrics are estimated on held-out interactions and may differ from online behavior.
         - Candidate set for ranking metrics is each user's items not seen in train.
         - Relevance is defined as test rating >= relevance threshold.
@@ -603,4 +615,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

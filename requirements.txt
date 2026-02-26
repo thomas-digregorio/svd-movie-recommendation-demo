@@ -1,0 +1,8 @@
+numpy>=2.0
+pandas>=2.2
+scipy>=1.17.1
+scikit-learn>=1.8.0
+scikit-surprise; python_version < "3.13"
+streamlit
+matplotlib
+requests
